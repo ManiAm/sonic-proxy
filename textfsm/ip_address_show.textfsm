@@ -1,0 +1,21 @@
+#
+# 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+#     link/ether 02:16:67:97:56:ef brd ff:ff:ff:ff:ff:ff
+#     inet 192.168.122.252/24 brd 192.168.122.255 scope global dynamic noprefixroute eth0
+#        valid_lft 2785sec preferred_lft 2785sec
+#     inet6 fe80::ff13:53c9:9ff2:53dd/64 scope link noprefixroute
+#        valid_lft forever preferred_lft forever
+#
+Value Required Interface (\S+)
+Value Flags (\S+)
+Value MTU (\S+)
+Value Mac (\S+)
+Value Ip (\S+)
+Value Bcast (\S+)
+Value Slash (\d+)
+
+Start
+  ^\d+:\s+${Interface}:\s+<${Flags}>\s+mtu\s+${MTU}\s+.*state\s+\S+\s+.*
+  ^\s+link\/\S+\s+${Mac}\s+.*
+  ^\s+inet\s+${Ip}\/${Slash}\s+brd\s+${Bcast}\s+.*
+  ^\s+inet\s+${Ip}\/${Slash} -> Record
