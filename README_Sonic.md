@@ -30,11 +30,11 @@ Verify QEMU installation:
 
 The [SONiC Azure Pipelines](https://sonic-build.azurewebsites.net/ui/sonic/Pipelines) portal hosts official CI/CD pipelines. Each pipeline is associated with a specific hardware platform (e.g., Broadcom, Mellanox, Marvell, Centec, Innovium, Virtual Switch). The portal allows you to monitor builds, access artifacts, and download images suitable for deployment and testing. There are three common ways to run SONiC:
 
-- Option 1: Run SONiC with QCOW2 Image
-- Option 2: Run SONiC Using ONIE Installer
-- Option 3: Create a Bootable Installer Disk
+- Option 1: Run SONiC Using ONIE Installer
+- Option 2: Create a Bootable Installer Disk
+- Option 3: Run SONiC with QCOW2 Image
 
-### Option 1: Run Sonic with QCOW2 Image
+### Option 1: Run Sonic Using ONIE Installer
 
 Navigate to the VS (Virtual Switch) pipeline on the Sonic CI portal.
 
@@ -44,58 +44,14 @@ Select the latest successful build by clicking on 'Artifacts'.
 
 Under artifacts, click on `sonic-buildimage.vs`.
 
-Download the artifact: `target/sonic-vs.img.gz` (note the double quotes around the URL):
+Download the artifact: `target/sonic-vs.bin` (note the double quotes around the URL):
 
 ```bash
 cd /tmp
-wget -O sonic-vs.img.gz "https://example.com/path/to/sonic-vs.img.gz"
+wget -O sonic-vs.bin "https://example.com/path/to/sonic-vs.bin"
 ```
 
-Extract the archive to get `sonic-vs.img`:
-
-```bash
-gunzip sonic-vs.img.gz
-```
-
-Validate the image:
-
-    file sonic-vs.img
-    sonic-vs.img: QEMU QCOW2 Image (v3), 17179869184 bytes
-
-You can load the QCOW2 disk image directly into QEMU with the following invocation:
-
-    sudo qemu-system-x86_64 \
-    -m 8192 \
-    -name sonic-vm \
-    -drive file=./img-sonic/sonic-vs.img,media=disk,if=virtio,index=0 \
-    -nographic \
-    -accel kvm \
-    -serial telnet:127.0.0.1:9000,server
-
-QEMU sets up a telnet server on your local machine (127.0.0.1) at port 9000. You can then connect to this server using a telnet client to interact with the serial console of the emulated machine:
-
-    telnet 127.0.0.1 9000
-
-When the login prompt appears, login with `admin`/`YourPaSsWoRd`.
-
-**Running Sonic VM using libvirt**
-
-For users leveraging libvirt, the official SONiC repository provides a pre-configured domain definition file: [sonic.xml](https://github.com/sonic-net/sonic-buildimage/blob/master/platform/vs/sonic.xml). This XML file describes the virtual machine configuration for the SONiC Virtual Switch (VS) platform. Before use, edit the XML file to:
-
-- Update the disk path to the absolute location of your `sonic-vs.img` file.
-- Comment out the "<qemu:commandline>" and "<apparmor>" sections if they cause compatibility issues with your host setup.
-
-To create and launch the VM:
-
-    virsh create <path/to/sonic/xml>
-
-Once the VM is running, you can connect to its console via Telnet:
-
-    telnet 127.0.0.1 7000
-
-### Option 2: Run Sonic Using ONIE Installer
-
-In the Sonic Image Azure pipeline you have access to `sonic-vs.bin` file. This file is not meant to be run directly as a VM disk image like a QCOW2 file. It contains a POSIX shell script wrapper, embedded compressed kernel + root filesystem and instructions for ONIE to extract and install the Sonic OS onto the virtual switch.
+This file is not meant to be run directly as a VM disk image. It contains a POSIX shell script wrapper, embedded compressed kernel + root filesystem and instructions for ONIE to extract and install the Sonic OS onto the virtual switch.
 
     file sonic-vs.bin
     sonic-vs.bin: POSIX shell script executable (binary data)
@@ -115,11 +71,10 @@ To boot the .bin file, ONIE runs first and executes the .bin to install Sonic. O
 
 When the switch is powered on, ONIE is the first to boot. It initializes the hardware and brings up the network interfaces. ONIE uses network protocols to discover available NOS installers on the network. This typically involves sending out DHCP requests to obtain an IP address and configuration details, followed by downloading the installer via HTTP, TFTP, or other supported protocols. Once the NOS installer is downloaded, ONIE executes it, and the installer takes over to complete the NOS installation process.
 
-Download `sonic-vs.bin` and `onie-recovery-x86_64-kvm_x86_64-r0.iso` files (note the double quotes around the URL):
+Download `onie-recovery-x86_64-kvm_x86_64-r0.iso` file (note the double quotes around the URL):
 
 ```bash
 cd /tmp
-wget -O sonic-vs.bin "https://example.com/path/to/sonic-vs.bin"
 wget -O onie-recovery-x86_64-kvm_x86_64-r0.iso "https://example.com/path/to/onie-recovery-x86_64-kvm_x86_64-r0.iso"
 ```
 
@@ -131,7 +86,7 @@ CD to the folder that has the `sonic-vs.bin` image and start a HTTP server:
 
     python3 -m http.server 8080
 
-Start the Sonic VM:
+Start the Sonic VM (note that we are using ONIE to load the sonic OS):
 
     sudo qemu-system-x86_64 \
     -m 8192 \
@@ -143,9 +98,7 @@ Start the Sonic VM:
     -accel kvm \
     -serial telnet:127.0.0.1:9000,server
 
-Note that we are using ONIE to load the sonic OS.
-
-Connect to the Sonic VM:
+QEMU sets up a telnet server on your local machine (127.0.0.1) at port 9000. You can then connect to this server using a telnet client to interact with the serial console of the emulated machine:
 
     telnet 127.0.0.1 9000
 
@@ -165,7 +118,7 @@ And start the NOS installation by:
 
 Wait for Sonic OS to come up. The default credential for login is `admin`/`YourPaSsWoRd`.
 
-Sonic is now installed on the sonic.qcow2. You can shut down the VM, then boot directly from the qcow2 disk (no need to boot ONIE again).
+Sonic is now installed on the `sonic.qcow2`. You can shut down the VM, then boot directly from the qcow2 disk (no need to boot ONIE again).
 
     sudo qemu-system-x86_64 \
     -m 8192 \
@@ -175,7 +128,7 @@ Sonic is now installed on the sonic.qcow2. You can shut down the VM, then boot d
     -accel kvm \
     -serial telnet:127.0.0.1:9000,server
 
-### Option 3: Create a Bootable Installer Disk
+### Option 2: Create a Bootable Installer Disk
 
 When using Sonic ONIE installer image, we started a http server on the host and used `onie-nos-install` to download the Sonic .bin image. You can package the .bin file (`sonic-vs.bin`) into a bootable installer disk image (`sonic-installer.img`):
 
@@ -208,10 +161,65 @@ Start the sonic VM. Note that the sonic disk image is loaded as a drive.
 
 ONIE will be able to automatically detect the `onie-installer.bin` and install Sonic.
 
-This method is also used by the official [build_kvm_image](https://github.com/sonic-net/sonic-buildimage/blob/master/scripts/build_kvm_image.sh) script in the Sonic repository. To invoke it yourselfe, go to the root of the sonic-buildimage repository. Invoke the `build_kvm_image` script.
+### Option 3: Run Sonic with QCOW2 Image
+
+To simplify the process, SONiC already provides a ready-to-use QCOW2 image that can be loaded directly into QEMU. In the Sonic Image Azure pipeline, download the artifact: `target/sonic-vs.img.gz` (note the double quotes around the URL):
+
+```bash
+cd /tmp
+wget -O sonic-vs.img.gz "https://example.com/path/to/sonic-vs.img.gz"
+```
+
+Extract the archive to get `sonic-vs.img`:
+
+```bash
+gunzip sonic-vs.img.gz
+```
+
+Validate the image:
+
+    file sonic-vs.img
+    sonic-vs.img: QEMU QCOW2 Image (v3), 17179869184 bytes
+
+You can load the QCOW2 disk image directly into QEMU with the following invocation:
+
+    sudo qemu-system-x86_64 \
+    -m 8192 \
+    -name sonic-vm \
+    -drive file=./img-sonic/sonic-vs.img,media=disk,if=virtio,index=0 \
+    -nographic \
+    -accel kvm \
+    -serial telnet:127.0.0.1:9000,server
+
+Connect to the Sonic VM:
+
+    telnet 127.0.0.1 9000
+
+When the login prompt appears, login with `admin`/`YourPaSsWoRd`.
+
+**How the QCOW2 Image Is Created**
+
+If you are curious how the QCOW2 image is built, SONiC provides a helper script in [build_kvm_image](https://github.com/sonic-net/sonic-buildimage/blob/master/scripts/build_kvm_image.sh). From the root of the sonic-buildimage repository, you can invoke it as follows.
 
     sudo ./scripts/build_kvm_image.sh \
     ./img-sonic/sonic.qcow2 \  # hard-disk
     ./img-sonic/onie-recovery-x86_64-kvm_x86_64-r0.iso \  # ONIE recovery ISO
     ./img-sonic/sonic-vs.bin \ # Installer
     16  # hard-disk size
+
+The script first creates an empty QCOW2 disk of the requested size, then builds a bootable installer disk (similar to Option 2) by formatting a raw image and copying `sonic-vs.bin` into it as `onie-installer.bin`. It then boots ONIE inside a QEMU VM using the ONIE recovery ISO as the CD-ROM, the QCOW2 disk as the primary drive, and the installer disk as a secondary drive, and uses `install_sonic.py` to install SONiC onto the QCOW2 disk. After installation, the VM is rebooted directly from the QCOW2 image and `check_install.py` verifies the system is healthy. The result is a fully installed, validated SONiC QCOW2 image (sonic.qcow2), which is subsequently compressed (into sonic-vs.img.gz) for distribution.
+
+**Running Sonic VM using libvirt**
+
+For users leveraging libvirt, the official SONiC repository provides a pre-configured domain definition file: [sonic.xml](https://github.com/sonic-net/sonic-buildimage/blob/master/platform/vs/sonic.xml). This XML file describes the virtual machine configuration for the SONiC Virtual Switch (VS) platform. Before use, edit the XML file to:
+
+- Update the disk path to the absolute location of your `sonic-vs.img` file.
+- Comment out the `"<qemu:commandline>"` and `"<apparmor>"` sections if they cause compatibility issues with your host setup.
+
+To create and launch the VM:
+
+    virsh create <path/to/sonic/xml>
+
+Once the VM is running, you can connect to its console via Telnet:
+
+    telnet 127.0.0.1 7000
